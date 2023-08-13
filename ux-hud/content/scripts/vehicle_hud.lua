@@ -3414,6 +3414,12 @@ function ux_value_in(value, list)
     return ux_list_contains(list, value)
 end
 
+function ux_list_add_absent(list, value)
+    if not ux_value_in(value, list) then
+        table.insert(list, value)
+    end
+end
+
 function ux_render_hover_info(data, pos, cursor_y, col)
     local st, err = pcall(function()
         if g_ux_screen_team == nil then
@@ -3432,10 +3438,8 @@ function ux_render_hover_info(data, pos, cursor_y, col)
             local attachment_y = cursor_y + 24
                 if data.ux_friendly then
                     -- get controller name
-                    local control_peer = data.vehicle:get_controlling_peer_id()
-                    if control_peer ~= 0 then
-                        local peer_index = update_get_peer_index_by_id(control_peer)
-                        local peer_name = update_get_peer_name(peer_index)
+                    local peer_name = ux_vehicle_control_peer_name(data.vehicle)
+                    if peer_name ~= nil then
                         idstr = idstr .. " (" .. peer_name .. ")"
                     end
 
@@ -3510,52 +3514,65 @@ function get_vehicle_capability(vehicle)
                         {
                             e_game_object_type.attachment_turret_15mm,  -- yes it is a 30mm really, just slow rate
                             e_game_object_type.attachment_turret_30mm,
-                            e_game_object_type.attachment_turret_gimbal_30mm
+                            e_game_object_type.attachment_turret_gimbal_30mm,
+                            e_game_object_type.attachment_turret_plane_chaingun,
                         }) then
-                    table.insert(capabilities, update_get_loc(e_loc.upp_gun) .. " 30mm")
+                    ux_list_add_absent(capabilities, update_get_loc(e_loc.upp_gun))
+
+                elseif ux_value_in(attachment_def,
+                        {
+                            e_game_object_type.attachment_turret_carrier_main_gun
+                        }) then
+                    ux_list_add_absent(capabilities, update_get_loc(e_loc.upp_gun) .. " 160mm")
 
                 elseif ux_value_in(attachment_def,
                         {
                             e_game_object_type.attachment_turret_40mm
                         }) then
-                    table.insert(capabilities, update_get_loc(e_loc.upp_gun) .. " 30mm")
+                    ux_list_add_absent(capabilities, update_get_loc(e_loc.upp_gun) .. " 30mm")
 
                 elseif ux_value_in(attachment_def,
                         {
                             e_game_object_type.attachment_turret_heavy_cannon,
                             e_game_object_type.attachment_turret_battle_cannon
                         }) then
-                    table.insert(capabilities, update_get_loc(e_loc.upp_gun) .. " 100mm")
+                    ux_list_add_absent(capabilities, update_get_loc(e_loc.upp_gun) .. " 100mm")
+
+                elseif ux_value_in(attachment_def,
+                        {
+                            e_game_object_type.attachment_turret_artillery
+                        }) then
+                    ux_list_add_absent(capabilities, update_get_loc(e_loc.upp_gun) .. " 120mm")
 
                 elseif ux_value_in(attachment_def, {
                     e_game_object_type.attachment_turret_missile,
                     e_game_object_type.attachment_turret_carrier_missile_silo,
                 }) then
-                    table.insert(capabilities, update_get_loc(e_loc.upp_msl))
+                    ux_list_add_absent(capabilities, update_get_loc(e_loc.upp_msl))
 
                 elseif ux_value_in(attachment_def, {
                     e_game_object_type.attachment_turret_ciws,
                     e_game_object_type.attachment_turret_carrier_ciws,
                 }) then
-                    table.insert(capabilities, "CIWS")
+                    ux_list_add_absent(capabilities, "CIWS")
 
                 elseif ux_value_in(attachment_def, {
                     e_game_object_type.attachment_turret_droid
                 }) then
-                    table.insert(capabilities, update_get_loc(e_loc.upp_droid))
+                    ux_list_add_absent(capabilities, update_get_loc(e_loc.upp_droid))
 
                 elseif ux_value_in(attachment_def,{
                     e_game_object_type.attachment_hardpoint_torpedo,
                     e_game_object_type.attachment_hardpoint_torpedo_noisemaker,
                     e_game_object_type.attachment_turret_carrier_torpedo
                 }) then
-                    table.insert(capabilities, update_get_loc(e_loc.upp_torpedo))
+                    ux_list_add_absent(capabilities, update_get_loc(e_loc.upp_torpedo))
 
                 elseif ux_value_in(attachment_def, {
                     e_game_object_type.attachment_hardpoint_missile_aa,
                     e_game_object_type.attachment_turret_carrier_missile,
                 }) then
-                    table.insert(capabilities,update_get_loc(e_loc.upp_msl) .. " " .. update_get_loc(e_loc.upp_aa))
+                    ux_list_add_absent(capabilities, update_get_loc(e_loc.upp_aa))
 
                 end
             end
@@ -3570,4 +3587,16 @@ function get_vehicle_capability(vehicle)
     end
 
     return result
+end
+
+function ux_vehicle_control_peer_name(vehicle)
+    if vehicle:get_team_id() == update_get_screen_team_id() then
+        local control_peer = vehicle:get_controlling_peer_id()
+        if control_peer ~= 0 then
+            local peer_index = update_get_peer_index_by_id(control_peer)
+            local peer_name = update_get_peer_name(peer_index)
+            return peer_name
+        end
+    end
+    return nil
 end
