@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<data name="UX:HUD"
+      author="Bredroll"
+      description="Stand-alone HUD inspired by UI Enhancer by QuantX
+
+This HUD Mod includes the rate-of-clime and CCIP portions of the UI Enhancer aircraft
+HUD by QuantX and Bredroll.
+
+It also replicates some of the basic UI Enhancer HUD features from scratch.
+
+* Hostile units are shown as red targets
+* Basic weapon information for hostile targets
+  - 30/40mm guns
+  - 100mm bear guns
+  - Bear artillery
+  - CIWS
+  - AA missiles
+  - Torpedoes
+* Human controlled friendly units show the operator handle
+
+The UX: series of mods are intended to be easily merged into other mods and mod packs
+
+">
+</data>
