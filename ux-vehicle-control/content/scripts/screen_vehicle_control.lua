@@ -172,7 +172,7 @@ g_is_ignore_tap = false
 g_map_render_mode = 1
 g_is_drag_pan_map = false
 g_viewing_vehicle_id = 0
-g_is_vehicle_team_colors = false
+g_is_vehicle_team_colors = true
 g_is_island_team_colors = true
 g_is_render_grid = true
 g_screen_w = 0
@@ -1165,6 +1165,12 @@ function update(screen_w, screen_h, ticks)
 
                             if vehicle_team == update_get_screen_team_id() then
                                 local waypoint_count = vehicle:get_waypoint_count()
+
+                                -- render team holomap cursor position
+                                if vehicle_definition_index == e_game_object_type.drydock then
+                                    local holo_wpt = ux_get_holomap_cursor_wpt(vehicle)
+                                    ux_render_holomap_cursor(holo_wpt)
+                                end
                                 
                                 if g_drag.vehicle_id == 0 or g_drag.vehicle_id == vehicle:get_id() then
                                     for j = 0, waypoint_count - 1, 1 do
@@ -2067,9 +2073,9 @@ function update(screen_w, screen_h, ticks)
 
             if highlighted_vehicle:get() then
                 if get_vehicle_has_robot_dogs(highlighted_vehicle) then
-                    render_tooltip(10, 10, screen_w - 20, screen_h - 20, g_cursor_pos_x, g_cursor_pos_y, 128, 31, 10, function(w, h) render_vehicle_tooltip(w, h, highlighted_vehicle) end)
+                    render_tooltip(10, 10, screen_w - 20, screen_h - 20, g_cursor_pos_x, g_cursor_pos_y, 128, 31 + 18, 10, function(w, h) render_vehicle_tooltip(w, h, highlighted_vehicle) end)
                 else
-                    render_tooltip(10, 10, screen_w - 20, screen_h - 20, g_cursor_pos_x, g_cursor_pos_y, 128, 21, 10, function(w, h) render_vehicle_tooltip(w, h, highlighted_vehicle) end)
+                    render_tooltip(10, 10, screen_w - 20, screen_h - 20, g_cursor_pos_x, g_cursor_pos_y, 128, 21 + 18, 10, function(w, h) render_vehicle_tooltip(w, h, highlighted_vehicle) end)
                 end
             end
         elseif g_highlighted.vehicle_id > 0 and g_highlighted.waypoint_id ~= 0 then
@@ -2724,6 +2730,8 @@ function render_vehicle_tooltip(w, h, vehicle)
     local vehicle_definition_index = vehicle:get_definition_index()
     local vehicle_definition_name, vehicle_definition_region = get_chassis_data_by_definition_index(vehicle_definition_index)
     local vehicle_name = vehicle_definition_name
+    local vehicle_ident = ""
+    local vehicle_human = ""
 
     local special_id = vehicle:get_special_id()
 
@@ -2731,7 +2739,12 @@ function render_vehicle_tooltip(w, h, vehicle)
         vehicle_name = vehicle_name .. " (" .. special_id .. ")"
     end
 
-    vehicle_name = vehicle_name .. string.format("(ID %d)", vehicle:get_id())
+    vehicle_ident = string.format("ID %d", vehicle:get_id())
+
+    local peer_name = ux_vehicle_control_peer_name(vehicle)
+    if peer_name ~= nil then
+        vehicle_human = peer_name
+    end
 
     local bar_h = 17
     local repair_factor = vehicle:get_repair_factor()
@@ -2765,8 +2778,11 @@ function render_vehicle_tooltip(w, h, vehicle)
     if vehicle:get_is_observation_type_revealed() then
         update_ui_image(cx, 2, vehicle_definition_region, color8(255, 255, 255, 255), 0)
         cx = cx + 18
-
         update_ui_text(cx, 6, vehicle_name, 124, 0, color8(255, 255, 255, 255), 0)
+        update_ui_text(cx, 6 + 9, vehicle_ident, 124, 0, color8(255, 255, 255, 255), 0)
+        if peer_name ~= nil then
+            update_ui_text(cx, 6 + 18, vehicle_human, 124, 0, color8(255, 255, 255, 255), 0)
+        end
         cx = cx + update_ui_get_text_size(vehicle_name, 10000, 0) + 2
     else
         update_ui_image(cx, 2, atlas_icons.icon_chassis_16_wheel_small, color_inactive, 0)
@@ -3081,3 +3097,73 @@ function get_is_vehicle_waypoint_available(vehicle)
     return true
 end
 
+
+function ux_vehicle_control_peer_name(vehicle)
+    if vehicle:get_team() == update_get_screen_team_id() then
+        local control_peer = vehicle:get_controlling_peer_id()
+        if control_peer ~= 0 then
+            local peer_index = update_get_peer_index_by_id(control_peer)
+            local peer_name = update_get_peer_name(peer_index)
+            return peer_name
+        end
+        return nil
+    end
+    return nil
+end
+
+g_ux_team_drydock = nil
+function ux_get_drydock()
+    if g_ux_team_drydock == nil then
+        local vehicle_count = update_get_map_vehicle_count()
+        for i = 0, vehicle_count - 1 do
+            local vehicle = update_get_map_vehicle_by_index(i)
+            if vehicle:get() then
+                if vehicle:get_definition_index() == e_game_object_type.drydock then
+                    g_ux_team_drydock = vehicle
+                end
+            end
+        end
+    end
+    return g_ux_team_drydock
+end
+
+
+function ux_get_holomap_cursor_wpt(drydock)
+    if drydock == nil then
+        drydock = ux_get_drydock()
+    end
+    if drydock ~= nil then
+        local n_wpts = drydock:get_waypoint_count()
+        if n_wpts > 0 then
+            for i = 0, n_wpts do
+                local wpt = drydock:get_waypoint(i)
+                if wpt ~= nil then
+                    --
+                end
+            end
+        end
+    end
+    return nil
+end
+
+function ux_render_holomap_cursor(holo_wpt)
+    if holo_wpt == nil then
+        holo_wpt = ux_get_holomap_cursor_wpt(nil)
+    end
+    if holo_wpt ~= nil then
+        local holo_pos = holo_wpt:get_position_xz()
+        local holo_x, holo_y = get_screen_from_world(
+        holo_pos:x(), holo_pos:y(),
+        g_camera_pos_x,
+        g_camera_pos_y,
+        g_camera_size, screen_w, screen_h)
+        -- ui enhancer fades if it no movement, we just render it always
+        update_ui_image_rot(holo_x, holo_y,
+        atlas_icons.map_icon_crosshair,
+        color8(255, 255, 255, 96), math.pi / 4)
+    end
+end
+
+function ux_dbg(msg)
+    update_ui_text(10, 10, msg, 400, 0, color_enemy, 0)
+end
