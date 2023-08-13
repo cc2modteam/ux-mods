@@ -144,7 +144,7 @@ function update(screen_w, screen_h, ticks)
         update_add_ui_interaction_special(update_get_loc(e_loc.interaction_zoom), e_ui_interaction_special.map_zoom)
 
         if update_get_is_notification_holomap_set() == false then
-            ux_render_holomap()
+            ux_render_holomap(screen_w, screen_h)
             update_add_ui_interaction_special(update_get_loc(e_loc.interaction_bearing), e_ui_interaction_special.interact_a_no_alt)
         end
     end
@@ -327,6 +327,9 @@ function update(screen_w, screen_h, ticks)
         local cursor_y = iff(update_get_is_focus_local(), g_cursor_pos_next_y, g_cursor_pos_y)
         local cursor_world_x, cursor_world_y = get_world_from_screen(cursor_x, cursor_y, g_map_x + g_map_x_offset, g_map_z + g_map_z_offset, g_map_size + g_map_size_offset, screen_w, screen_h, 2.6 / 1.6)
 
+        g_ux_cursor_world_x = cursor_world_x
+        g_ux_cursor_world_y = cursor_world_y
+
         local cx = 20
         local cy = screen_h - 20
         local icon_col = color_white
@@ -427,10 +430,13 @@ function input_event(event, action)
         if update_get_is_notification_holomap_set() == false then
             g_is_show_bearing = action == e_input_action.press
         end
+    elseif event == e_input.action_b then
+        ux_markers.interact_b_pressed = action == e_input_action.press
     elseif event == e_input.pointer_1 then
         g_is_pointer_pressed = action == e_input_action.press
     elseif event == e_input.back then
         g_is_pointer_pressed = false
+        ux_markers.interact_b_pressed  = false
         g_is_show_cursor = false
         g_is_show_bearing = false
         update_set_screen_state_exit()
@@ -741,13 +747,20 @@ function ux_get_drydock()
     return g_ux_team_drydock
 end
 
+g_ux_cursor_world_x = 0
+g_ux_cursor_world_y = 0
 
 ux_waypoint_alt_flags = {
   holomap = 1 << 8,
 
-  marker_x = 1 << 9,
-  marker_y = 1 << 10,
-  marker_z = 1 << 11,
+  marker_x = 1 << 20,
+  marker_y = 1 << 21,
+  marker_z = 1 << 22,
+}
+
+ux_markers = {
+    interact_b_pressed = false,
+    hover_wpt = nil
 }
 
 function ux_wpt_is_holomap(waypoint_altitude)
@@ -755,19 +768,63 @@ function ux_wpt_is_holomap(waypoint_altitude)
 end
 
 
-function ux_render_markers(drydock)
+function ux_render_markers(drydock, screen_w, screen_h)
     if drydock == nil then
         drydock = ux_get_drydock()
     end
+
     if drydock ~= nil then
         local n_wpts = drydock:get_waypoint_count()
+        ux_markers.hover_wpt = nil
         if n_wpts > 0 then
             for i = 0, n_wpts do
                 local wpt = drydock:get_waypoint(i)
                 local alt = wpt:get_altitude()
-                if not ux_wpt_is_holomap(alt) then
-                    -- not the cursor, draw it
-                end
+                --if alt >= ux_waypoint_alt_flags.marker_x then
+                    -- a marker
+                    local pos = wpt:get_position_xz()
+                    local dx = math.abs(pos:x() - g_ux_cursor_world_x)
+                    local dy = math.abs(pos:y() - g_ux_cursor_world_y)
+                    local screen_pos_x, screen_pos_y = get_screen_from_world(pos:x(), pos:y(),
+                            g_map_x + g_map_x_offset, g_map_z + g_map_z_offset,
+                            g_map_size + g_map_size_offset, screen_w, screen_h, 2.6 / 1.6)
+                    update_ui_circle(screen_pos_x, screen_pos_y, 30, 8, color8(0, 0, 244, 192))
+
+                    if (dx + dy) < 200 then
+                        ux_markers.hover_wpt = wpt:get_id()
+                    end
+                --end
+            end
+        end
+        if ux_markers.hover_wpt == nil then
+            update_add_ui_interaction(
+                    "add marker", e_game_input.interact_b)
+
+            if ux_markers.interact_b_pressed then
+                ux_markers.interact_b_pressed = false
+                ux_markers.hover_wpt = nil
+                local added = drydock:add_waypoint(
+                        g_ux_cursor_world_x,
+                        g_ux_cursor_world_y
+                )
+                drydock:set_waypoint_altitude(added, ux_waypoint_alt_flags.marker_x)
+                ux_dbg(string.format("add marker %d", added))
+            end
+        else
+            ux_dbg(string.format("hovering marker %d", ux_markers.hover_wpt))
+            update_add_ui_interaction(
+                    "remove marker", e_game_input.interact_b)
+            if ux_markers.interact_b_pressed then
+                ux_dbg(string.format("del marker %d", ux_markers.hover_wpt))
+                ux_markers.interact_b_pressed = false
+                ux_markers.hover_wpt = nil
+                -- remove
+                ux_replace_waypoint(drydock,
+                        function(wpt)
+                            return wpt:get_id() == ux_markers.hover_wpt
+                        end,
+                        nil
+                )
             end
         end
     end
@@ -783,12 +840,13 @@ function ux_replace_waypoint(vehicle, match_func, replace)
             -- keep
             local pos = wpt:get_position_xz()
             local alt = wpt:get_altitude()
-            changed = true
             table.insert(keep_wpts, {
                 x = pos:x(),
                 z = pos:y(),
                 alt = alt
             })
+        else
+            changed = true
         end
     end
 
@@ -808,8 +866,6 @@ function ux_replace_waypoint(vehicle, match_func, replace)
                     replace.x, replace.z
             )
         vehicle:set_waypoint_altitude(added, replace.alt)
-        ux_dbg(string.format("x=%d, y=%d, a=%d", replace.x, replace.z, replace.alt))
-
     end
 
 end
@@ -836,9 +892,10 @@ function ux_update_holomap_cursor(wx, wy)
 
 end
 
-function ux_render_holomap()
+function ux_render_holomap(screen_w, screen_h)
     local st, err = pcall(function()
-
+        local drydock = ux_get_drydock()
+        ux_render_markers(drydock, screen_w, screen_h)
     end)
     if not st then
         ux_dbg(err)
@@ -846,6 +903,6 @@ function ux_render_holomap()
 end
 
 function ux_dbg(msg)
-    update_ui_text(10, 10, msg, 400, 0, color_enemy, 0)
     print(msg)
+    update_ui_text(10, 10, msg, 400, 0, color_enemy, 0)
 end
