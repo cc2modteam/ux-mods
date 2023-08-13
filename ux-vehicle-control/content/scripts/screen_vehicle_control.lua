@@ -1148,6 +1148,11 @@ function update(screen_w, screen_h, ticks)
                     if vehicle:get() then
                         local vehicle_definition_index = vehicle:get_definition_index()
 
+                        -- render team holomap cursor position
+                        if vehicle_definition_index == e_game_object_type.drydock then
+                            ux_render_markers(vehicle, screen_w, screen_h)
+                        end
+
                         if vehicle_definition_index ~= e_game_object_type.chassis_spaceship and vehicle_definition_index ~= e_game_object_type.drydock then
                             local vehicle_team = vehicle:get_team()
                             local vehicle_attached_parent_id = vehicle:get_attached_parent_id()
@@ -1166,12 +1171,6 @@ function update(screen_w, screen_h, ticks)
                             if vehicle_team == update_get_screen_team_id() then
                                 local waypoint_count = vehicle:get_waypoint_count()
 
-                                -- render team holomap cursor position
-                                if vehicle_definition_index == e_game_object_type.drydock then
-                                    local holo_wpt = ux_get_holomap_cursor_wpt(vehicle)
-                                    ux_render_holomap_cursor(holo_wpt)
-                                end
-                                
                                 if g_drag.vehicle_id == 0 or g_drag.vehicle_id == vehicle:get_id() then
                                     for j = 0, waypoint_count - 1, 1 do
                                         local waypoint = vehicle:get_waypoint(j)
@@ -3128,28 +3127,19 @@ function ux_get_drydock()
 end
 
 
-function ux_get_holomap_cursor_wpt(drydock)
-    if drydock == nil then
-        drydock = ux_get_drydock()
-    end
-    if drydock ~= nil then
-        local n_wpts = drydock:get_waypoint_count()
-        if n_wpts > 0 then
-            for i = 0, n_wpts do
-                local wpt = drydock:get_waypoint(i)
-                if wpt ~= nil then
-                    --
-                end
-            end
-        end
-    end
-    return nil
+ux_waypoint_alt_flags = {
+  holomap = 1 << 8,
+
+  marker_x = 1 << 9,
+  marker_y = 1 << 10,
+  marker_z = 1 << 11,
+}
+
+function ux_wpt_is_holomap(waypoint_altitude)
+    return waypoint_altitude & ux_waypoint_alt_flags.holomap ~= 0
 end
 
-function ux_render_holomap_cursor(holo_wpt)
-    if holo_wpt == nil then
-        holo_wpt = ux_get_holomap_cursor_wpt(nil)
-    end
+function ux_render_holomap_cursor(holo_wpt, screen_w, screen_h)
     if holo_wpt ~= nil then
         local holo_pos = holo_wpt:get_position_xz()
         local holo_x, holo_y = get_screen_from_world(
@@ -3164,6 +3154,36 @@ function ux_render_holomap_cursor(holo_wpt)
     end
 end
 
+function ux_render_markers(drydock, screen_w, screen_h)
+    if drydock == nil then
+        drydock = ux_get_drydock()
+    end
+
+    local st, err = pcall(
+            function()
+                if drydock ~= nil then
+                    local n_wpts = drydock:get_waypoint_count()
+                    if n_wpts > 0 then
+
+                        for i = 0, n_wpts do
+                            local wpt = drydock:get_waypoint(i)
+                            local alt = math.floor(wpt:get_altitude())
+                            if ux_wpt_is_holomap(alt) then
+                                ux_render_holomap_cursor(wpt, screen_w, screen_h)
+                            end
+                        end
+                    end
+                end
+            end
+    )
+    if not st then
+        ux_dbg(err)
+    end
+
+
+end
+
 function ux_dbg(msg)
+    print(msg)
     update_ui_text(10, 10, msg, 400, 0, color_enemy, 0)
 end

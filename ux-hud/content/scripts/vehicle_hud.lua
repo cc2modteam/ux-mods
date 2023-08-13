@@ -3474,6 +3474,7 @@ end
 
 function ux_dbg(msg)
     update_ui_text(10, 10, msg, 400, 0, color_enemy, 0)
+    print(msg)
 end
 
 function ux_update_per_unit(data, v)
