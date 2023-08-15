@@ -431,12 +431,17 @@ function input_event(event, action)
             g_is_show_bearing = action == e_input_action.press
         end
     elseif event == e_input.action_b then
-        ux_markers.interact_b_pressed = action == e_input_action.press
+        g_is_dismiss_pressed = action == e_input_action.press
+
+        if update_get_is_notification_holomap_set() == false then
+            ux_markers.open_marker_pallet = action == e_input_action.press
+        end
+
     elseif event == e_input.pointer_1 then
         g_is_pointer_pressed = action == e_input_action.press
     elseif event == e_input.back then
         g_is_pointer_pressed = false
-        ux_markers.interact_b_pressed  = false
+        ux_markers.open_marker_pallet  = false
         g_is_show_cursor = false
         g_is_show_bearing = false
         update_set_screen_state_exit()
@@ -759,14 +764,21 @@ ux_waypoint_alt_flags = {
 }
 
 ux_markers = {
-    interact_b_pressed = false,
-    hover_wpt = nil
+    open_marker_pallet = false,
+    hover_wpt = nil,
+    cursor_ttl = 5,  -- skip this many updates between updating the map cursor
 }
 
 function ux_wpt_is_holomap(waypoint_altitude)
     return waypoint_altitude & ux_waypoint_alt_flags.holomap ~= 0
 end
 
+function ux_add_marker(wx, wy, flags)
+    local added = drydock:add_waypoint(wx, wy)
+    drydock:set_waypoint_altitude(added, flags)
+    ux_dbg(string.format("add marker %d", added))
+    return added
+end
 
 function ux_render_markers(drydock, screen_w, screen_h)
     if drydock == nil then
@@ -777,6 +789,7 @@ function ux_render_markers(drydock, screen_w, screen_h)
         local n_wpts = drydock:get_waypoint_count()
         ux_markers.hover_wpt = nil
         if n_wpts > 0 then
+            ux_dbg(n_wpts)
             for i = 0, n_wpts do
                 local wpt = drydock:get_waypoint(i)
                 local alt = wpt:get_altitude()
@@ -788,7 +801,7 @@ function ux_render_markers(drydock, screen_w, screen_h)
                     local screen_pos_x, screen_pos_y = get_screen_from_world(pos:x(), pos:y(),
                             g_map_x + g_map_x_offset, g_map_z + g_map_z_offset,
                             g_map_size + g_map_size_offset, screen_w, screen_h, 2.6 / 1.6)
-                    update_ui_circle(screen_pos_x, screen_pos_y, 30, 8, color8(0, 0, 244, 192))
+                    update_ui_circle(screen_pos_x, screen_pos_y, 30, 12, color8(0, 0, 244, 192))
 
                     if (dx + dy) < 200 then
                         ux_markers.hover_wpt = wpt:get_id()
@@ -797,35 +810,9 @@ function ux_render_markers(drydock, screen_w, screen_h)
             end
         end
         if ux_markers.hover_wpt == nil then
-            update_add_ui_interaction(
-                    "add marker", e_game_input.interact_b)
 
-            if ux_markers.interact_b_pressed then
-                ux_markers.interact_b_pressed = false
-                ux_markers.hover_wpt = nil
-                local added = drydock:add_waypoint(
-                        g_ux_cursor_world_x,
-                        g_ux_cursor_world_y
-                )
-                drydock:set_waypoint_altitude(added, ux_waypoint_alt_flags.marker_x)
-                ux_dbg(string.format("add marker %d", added))
-            end
         else
-            ux_dbg(string.format("hovering marker %d", ux_markers.hover_wpt))
-            update_add_ui_interaction(
-                    "remove marker", e_game_input.interact_b)
-            if ux_markers.interact_b_pressed then
-                ux_dbg(string.format("del marker %d", ux_markers.hover_wpt))
-                ux_markers.interact_b_pressed = false
-                ux_markers.hover_wpt = nil
-                -- remove
-                ux_replace_waypoint(drydock,
-                        function(wpt)
-                            return wpt:get_id() == ux_markers.hover_wpt
-                        end,
-                        nil
-                )
-            end
+
         end
     end
 end
@@ -833,6 +820,7 @@ end
 function ux_replace_waypoint(vehicle, match_func, replace)
     local wpt_count = vehicle:get_waypoint_count()
     local changed = false
+    local found = false
     local keep_wpts = {}
     for i = 0, wpt_count do
         local wpt = vehicle:get_waypoint(i)
@@ -852,6 +840,7 @@ function ux_replace_waypoint(vehicle, match_func, replace)
 
     if changed then
         vehicle:clear_waypoints()
+        ux_dbg("\ncleared")
         for i = 1, #keep_wpts do
             local data = keep_wpts[i]
             local added = vehicle:add_waypoint(
@@ -862,10 +851,12 @@ function ux_replace_waypoint(vehicle, match_func, replace)
     end
 
     if replace ~= nil then
-        local added = vehicle:add_waypoint(
+        if changed or not found then
+            local added = vehicle:add_waypoint(
                     replace.x, replace.z
             )
-        vehicle:set_waypoint_altitude(added, replace.alt)
+            vehicle:set_waypoint_altitude(added, replace.alt)
+        end
     end
 
 end
@@ -873,6 +864,12 @@ end
 function ux_update_holomap_cursor(wx, wy)
     local st, err = pcall(
             function()
+                if ux_markers.cursor_ttl > 0 then
+                    ux_markers.cursor_ttl = ux_markers.cursor_ttl - 1
+                    return
+                end
+                ux_markers.cursor_ttl = 2
+
                 local drydock = ux_get_drydock()
                 ux_replace_waypoint(drydock,
                 function(wpt)
