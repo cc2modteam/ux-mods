@@ -3145,6 +3145,16 @@ function ux_wpt_is_holomap(waypoint)
     return ux_wpt_alt_is_holomap(alt)
 end
 
+
+function ux_wpt_marker_ident_str(waypoint)
+    local alt = waypoint:get_altitude()
+    local value = alt & 0xff
+    if value ~= 0 then
+        return string.char(value)
+    end
+    return " "
+end
+
 function ux_render_holomap_cursor(holo_wpt, screen_w, screen_h)
     if holo_wpt ~= nil then
         local holo_pos = holo_wpt:get_position_xz()
@@ -3167,6 +3177,9 @@ function ux_render_marker(wpt, screen_w, screen_h)
         local angle_prev = 0
         local screen_pos_x, screen_pos_y = get_screen_from_world(world_pos_x, world_pos_y, g_camera_pos_x, g_camera_pos_y, g_camera_size, screen_w, screen_h)
 
+        local ident = ux_wpt_marker_ident_str(wpt)
+        update_ui_text(screen_pos_x, screen_pos_y, ident, 8, 2, col, 0)
+
         update_ui_begin_triangles()
 
         for i = 1, steps do
@@ -3182,6 +3195,7 @@ function ux_render_marker(wpt, screen_w, screen_h)
             angle_prev = angle
         end
         update_ui_end_triangles()
+
     end
 
     local pos = wpt:get_position_xz()

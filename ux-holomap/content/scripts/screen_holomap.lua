@@ -151,7 +151,7 @@ function update(screen_w, screen_h, ticks)
                 if ux_markers.hover_wpt == nil then
                     update_add_ui_interaction("add marker", e_game_input.interact_a)
                 else
-                    update_add_ui_interaction("remove marker", e_game_input.interact_a)
+                    update_add_ui_interaction("edit marker", e_game_input.interact_a)
                 end
             end
         end
@@ -792,7 +792,6 @@ ux_markers = {
     edit_marker = nil,
     cursor_ttl = 5,  -- skip this many updates between updating the map cursor
 
-    next_marker_ident = 1,
     last_cursor_pos = nil
 }
 
@@ -825,28 +824,36 @@ function ux_wpt_is_holomap(waypoint)
     return result
 end
 
-function ux_wpt_marker_ident(waypoint)
+function ux_wpt_marker_ident_str(waypoint)
     local alt = waypoint:get_altitude()
-    return alt & 0xff
+    local value = alt & 0xff
+    if value ~= 0 then
+        return string.char(value)
+    end
+    return " "
+end
+
+function ux_wpt_set_marker_ident(vehicle, waypoint, char)
+    local alt = waypoint:get_altitude()
+    local masked = alt & 0xffffff00
+    local new_alt = masked | string.byte(char)
+    vehicle:set_waypoint_altitude(waypoint:get_id(), new_alt)
 end
 
 function ux_add_marker(wx, wy, flags)
     local drydock = ux_get_drydock()
     local added = drydock:add_waypoint(wx, wy)
 
-    drydock:set_waypoint_altitude(added, flags + ux_markers.next_marker_ident)
-    ux_markers.next_marker_ident = ux_markers.next_marker_ident + 1
+    drydock:set_waypoint_altitude(added, flags)
     return added
 end
 
 function ux_remove_marker(wpt)
     local wpt_id = wpt:get_id()
     local drydock = ux_get_drydock()
-    local ident = ux_wpt_marker_ident(wpt)
     ux_replace_waypoint(drydock, function(w)
                         return w:get_id() == wpt_id
                     end, nil)
-    ux_markers.next_marker_ident = ident
 end
 
 function ux_render_markers(drydock, screen_w, screen_h)
@@ -875,8 +882,9 @@ function ux_render_markers(drydock, screen_w, screen_h)
                     local alt = wpt:get_altitude()
                     if alt >= ux_waypoint_alt_flags.marker_x then
                         -- is a marker
-                        update_ui_circle(screen_pos_x, screen_pos_y, 20, 6, color8(0, 244, 0, 126))
-
+                        local ident = ux_wpt_marker_ident_str(wpt)
+                        update_ui_circle(screen_pos_x, screen_pos_y, 20, 12, color8(0, 244, 0, 64))
+                        update_ui_text(screen_pos_x, screen_pos_y, ident, 8, 2, color8(255, 255, 255, 200), 0)
                         if dist < 200 then
                             ux_markers.hover_wpt = wpt
                         end
@@ -893,14 +901,13 @@ function ux_render_markers(drydock, screen_w, screen_h)
                     ux_add_marker(g_ux_cursor_world_x, g_ux_cursor_world_y, ux_waypoint_alt_flags.marker_x)
                 else
                     ux_markers.edit_marker = ux_markers.hover_wpt
-                    -- ux_remove_marker(ux_markers.hover_wpt)
                     ux_markers.hover_wpt = nil
                     g_is_pointer_pressed = false
                 end
             end
         end
         if ux_markers.edit_marker ~= nil then
-            update_set_screen_background_type(2)
+            update_set_screen_background_type(1)
             local ui = g_ui
             local window =  ui:begin_window(
                     "Marker",
@@ -910,20 +917,71 @@ function ux_render_markers(drydock, screen_w, screen_h)
             window.label_bias = 0.8
             ui:header("Edit Marker")
 
+
+
             local marker_action = ui:button_group({
-                "Delete",
-                "+ 200m",
-                "- 200m",
+                "Del",
             }, true)
 
-            if marker_action ~= nil then
-                -- -1 = nothing
+            local marker_label = ui:button_group({
+                " ",
+                "A",
+                "B",
+                "C",
+                "D",
+                "G",
+                "R",
+                "N",
+                "O",
+                "X",
+                "Y",
+                "Z",
+            }, true)
+
+            ux_dbg(string.format("%d\n%d", marker_action, marker_label))
+
+            -- -1 = nothing
+            if marker_action >= 0 then
+                ux_dbg(marker_action)
                 if marker_action == 0 then
+                    -- del
                     ux_remove_marker(ux_markers.edit_marker)
-                    ux_markers.edit_marker = nil
-                    g_is_pointer_pressed = false
                 end
+                ux_markers.edit_marker = nil
+                ux_markers.edit_mode = false
             end
+
+            if marker_label >= 0 then
+                if marker_label == 0 then
+                    ux_wpt_set_marker_ident(drydock, ux_markers.edit_marker, " ")
+                elseif marker_label == 1 then
+                    ux_wpt_set_marker_ident(drydock, ux_markers.edit_marker, "A")
+                elseif marker_label == 2 then
+                    ux_wpt_set_marker_ident(drydock, ux_markers.edit_marker, "B")
+                elseif marker_label == 3 then
+                    ux_wpt_set_marker_ident(drydock, ux_markers.edit_marker, "C")
+                elseif marker_label == 4 then
+                    ux_wpt_set_marker_ident(drydock, ux_markers.edit_marker, "D")
+                elseif marker_label == 5 then
+                    ux_wpt_set_marker_ident(drydock, ux_markers.edit_marker, "G")
+                elseif marker_label == 6 then
+                    ux_wpt_set_marker_ident(drydock, ux_markers.edit_marker, "R")
+                elseif marker_label == 7 then
+                    ux_wpt_set_marker_ident(drydock, ux_markers.edit_marker, "N")
+                elseif marker_label == 8 then
+                    ux_wpt_set_marker_ident(drydock, ux_markers.edit_marker, "O")
+                elseif marker_label == 9 then
+                    ux_wpt_set_marker_ident(drydock, ux_markers.edit_marker, "X")
+                elseif marker_label == 10 then
+                    ux_wpt_set_marker_ident(drydock, ux_markers.edit_marker, "Y")
+                elseif marker_label == 11 then
+                    ux_wpt_set_marker_ident(drydock, ux_markers.edit_marker, "Z")
+                end
+
+                ux_markers.edit_marker = nil
+                ux_markers.edit_mode = false
+            end
+
 
             ui:end_window()
         end
@@ -982,14 +1040,6 @@ function ux_update_holomap_cursor(wx, wy)
             return
         end
         local new_pos = ux_pos:new(wx, wy)
-        -- if it didnt move, just return
-        if ux_markers.last_cursor_pos ~= nil then
-            -- check dist
-            local delta = vec2_dist(new_pos, ux_markers.last_cursor_pos)
-            if delta < 50 then
-                return
-            end
-        end
         ux_markers.last_cursor_pos = new_pos
 
         ux_markers.cursor_ttl = 2
