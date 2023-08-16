@@ -3110,20 +3110,21 @@ function ux_vehicle_control_peer_name(vehicle)
     return nil
 end
 
-g_ux_team_drydock = nil
+
 function ux_get_drydock()
-    if g_ux_team_drydock == nil then
-        local vehicle_count = update_get_map_vehicle_count()
-        for i = 0, vehicle_count - 1 do
-            local vehicle = update_get_map_vehicle_by_index(i)
-            if vehicle:get() then
-                if vehicle:get_definition_index() == e_game_object_type.drydock then
-                    g_ux_team_drydock = vehicle
+    local team_id = update_get_screen_team_id()
+    local vehicle_count = update_get_map_vehicle_count()
+    for i = 0, vehicle_count - 1 do
+        local vehicle = update_get_map_vehicle_by_index(i)
+        if vehicle:get() then
+            if vehicle:get_definition_index() == e_game_object_type.drydock then
+                if vehicle:get_team() == team_id then
+                    return vehicle
                 end
             end
         end
     end
-    return g_ux_team_drydock
+    return nil
 end
 
 
@@ -3135,8 +3136,13 @@ ux_waypoint_alt_flags = {
   marker_z = 1 << 11,
 }
 
-function ux_wpt_is_holomap(waypoint_altitude)
+function ux_wpt_alt_is_holomap(waypoint_altitude)
     return waypoint_altitude & ux_waypoint_alt_flags.holomap ~= 0
+end
+
+function ux_wpt_is_holomap(waypoint)
+    local alt = waypoint:get_altitude()
+    return ux_wpt_alt_is_holomap(alt)
 end
 
 function ux_render_holomap_cursor(holo_wpt, screen_w, screen_h)
@@ -3162,14 +3168,15 @@ function ux_render_markers(drydock, screen_w, screen_h)
     local st, err = pcall(
             function()
                 if drydock ~= nil then
-                    local n_wpts = drydock:get_waypoint_count()
-                    if n_wpts > 0 then
-
-                        for i = 0, n_wpts do
-                            local wpt = drydock:get_waypoint(i)
-                            local alt = math.floor(wpt:get_altitude())
-                            if ux_wpt_is_holomap(alt) then
-                                ux_render_holomap_cursor(wpt, screen_w, screen_h)
+                    if drydock:get() then
+                        local n_wpts = drydock:get_waypoint_count()
+                        if n_wpts > 0 then
+                            for i = 0, n_wpts do
+                                local wpt = drydock:get_waypoint(i)
+                                if ux_wpt_is_holomap(wpt) then
+                                    ux_render_holomap_cursor(wpt, screen_w, screen_h)
+                                    break
+                                end
                             end
                         end
                     end
