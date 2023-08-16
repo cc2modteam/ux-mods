@@ -883,7 +883,7 @@ function ux_render_markers(drydock, screen_w, screen_h)
                     if alt >= ux_waypoint_alt_flags.marker_x then
                         -- is a marker
                         local ident = ux_wpt_marker_ident_str(wpt)
-                        update_ui_circle(screen_pos_x, screen_pos_y, 20, 12, color8(0, 244, 0, 64))
+                        update_ui_circle(screen_pos_x, screen_pos_y, 20, 12, color8(0, 96, 0, 32))
                         update_ui_text(screen_pos_x, screen_pos_y, ident, 8, 2, color8(255, 255, 255, 200), 0)
                         if dist < 200 then
                             ux_markers.hover_wpt = wpt
@@ -911,8 +911,8 @@ function ux_render_markers(drydock, screen_w, screen_h)
             local ui = g_ui
             local window =  ui:begin_window(
                     "Marker",
-                    30, 30,
-                    screen_w - 60, screen_h - 60,
+                    30, 170,
+                    screen_w - 60, screen_h - 100,
                     atlas_icons.column_distance, true, 2)
             window.label_bias = 0.8
             ui:header("Edit Marker")
@@ -920,7 +920,8 @@ function ux_render_markers(drydock, screen_w, screen_h)
 
 
             local marker_action = ui:button_group({
-                "Del",
+                "Delete",
+                "Cancel"
             }, true)
 
             local marker_label = ui:button_group({
@@ -938,14 +939,14 @@ function ux_render_markers(drydock, screen_w, screen_h)
                 "Z",
             }, true)
 
-            ux_dbg(string.format("%d\n%d", marker_action, marker_label))
-
             -- -1 = nothing
             if marker_action >= 0 then
                 ux_dbg(marker_action)
                 if marker_action == 0 then
                     -- del
                     ux_remove_marker(ux_markers.edit_marker)
+                else
+                    -- cancel
                 end
                 ux_markers.edit_marker = nil
                 ux_markers.edit_mode = false
