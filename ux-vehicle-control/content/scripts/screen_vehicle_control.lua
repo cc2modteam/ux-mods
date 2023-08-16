@@ -3160,6 +3160,38 @@ function ux_render_holomap_cursor(holo_wpt, screen_w, screen_h)
     end
 end
 
+function ux_render_marker(wpt, screen_w, screen_h)
+    local function render_marker_circle(world_pos_x, world_pos_y, radius, col)
+        local steps = 16
+        local step = math.pi * 2 / steps
+        local angle_prev = 0
+        local screen_pos_x, screen_pos_y = get_screen_from_world(world_pos_x, world_pos_y, g_camera_pos_x, g_camera_pos_y, g_camera_size, screen_w, screen_h)
+
+        update_ui_begin_triangles()
+
+        for i = 1, steps do
+            local angle = step * i
+            local x0, y0 = get_screen_from_world(world_pos_x + math.cos(angle_prev) * radius, world_pos_y + math.sin(angle_prev) * radius, g_camera_pos_x, g_camera_pos_y, g_camera_size, screen_w, screen_h)
+            local x1, y1 = get_screen_from_world(world_pos_x + math.cos(angle) * radius, world_pos_y + math.sin(angle) * radius, g_camera_pos_x, g_camera_pos_y, g_camera_size, screen_w, screen_h)
+
+            update_ui_line(x0, y0, x1, y1, col)
+
+            local fill_col = color8(col:r(), col:g(), col:b(), col:a())
+            update_ui_add_triangle(vec2(x0, y0), vec2(x1, y1), vec2(screen_pos_x, screen_pos_y), fill_col)
+
+            angle_prev = angle
+        end
+        update_ui_end_triangles()
+    end
+
+    local pos = wpt:get_position_xz()
+    render_marker_circle(
+            pos:x(),
+            pos:y(),
+            2000,
+            color8(0, 244, 0, 8))
+end
+
 function ux_render_markers(drydock, screen_w, screen_h)
     if drydock == nil then
         drydock = ux_get_drydock()
@@ -3171,12 +3203,14 @@ function ux_render_markers(drydock, screen_w, screen_h)
                     if drydock:get() then
                         local n_wpts = drydock:get_waypoint_count()
                         if n_wpts > 0 then
-                            for i = 0, n_wpts do
+                            for i = 0, n_wpts - 1 do
                                 local wpt = drydock:get_waypoint(i)
                                 if ux_wpt_is_holomap(wpt) then
                                     ux_render_holomap_cursor(wpt, screen_w, screen_h)
-                                    break
+                                else
+                                    ux_render_marker(wpt, screen_w, screen_h)
                                 end
+
                             end
                         end
                     end

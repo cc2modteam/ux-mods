@@ -140,13 +140,25 @@ function update(screen_w, screen_h, ticks)
     end
 
     if g_is_show_bearing == false then
-        update_add_ui_interaction_special(update_get_loc(e_loc.interaction_pan), e_ui_interaction_special.map_pan)
-        update_add_ui_interaction_special(update_get_loc(e_loc.interaction_zoom), e_ui_interaction_special.map_zoom)
-
         if update_get_is_notification_holomap_set() == false then
             ux_render_holomap(screen_w, screen_h)
-            update_add_ui_interaction_special(update_get_loc(e_loc.interaction_bearing), e_ui_interaction_special.interact_a_no_alt)
+            if ux_markers.edit_mode == false then
+                update_add_ui_interaction_special(update_get_loc(e_loc.interaction_bearing), e_ui_interaction_special.interact_a_no_alt)
+                update_add_ui_interaction("edit markers", e_game_input.interact_b)
+                update_add_ui_interaction_special(update_get_loc(e_loc.interaction_pan), e_ui_interaction_special.map_pan)
+                update_add_ui_interaction_special(update_get_loc(e_loc.interaction_zoom), e_ui_interaction_special.map_zoom)
+            else
+                if ux_markers.hover_wpt == nil then
+                    update_add_ui_interaction("add marker", e_game_input.interact_a)
+                else
+                    update_add_ui_interaction("remove marker", e_game_input.interact_a)
+                end
+            end
         end
+    end
+
+    if ux_markers.edit_mode == false then
+
     end
 
     if g_is_map_pos_initialised == false then
@@ -432,17 +444,16 @@ function input_event(event, action)
             g_is_show_bearing = action == e_input_action.press
         end
     elseif event == e_input.action_b then
-        g_is_dismiss_pressed = action == e_input_action.press
-
         if update_get_is_notification_holomap_set() == false then
-            ux_markers.open_marker_pallet = action == e_input_action.press
+            ux_markers.edit_mode = action == e_input_action.press
         end
 
     elseif event == e_input.pointer_1 then
         g_is_pointer_pressed = action == e_input_action.press
+
     elseif event == e_input.back then
         g_is_pointer_pressed = false
-        ux_markers.open_marker_pallet  = false
+        ux_markers.edit_mode = false
         g_is_show_cursor = false
         g_is_show_bearing = false
         update_set_screen_state_exit()
@@ -765,9 +776,11 @@ ux_waypoint_alt_flags = {
 }
 
 ux_markers = {
-    open_marker_pallet = false,
+    edit_mode = false,
     hover_wpt = nil,
     cursor_ttl = 5,  -- skip this many updates between updating the map cursor
+
+    next_marker_ident = 1
 }
 
 ux_pos = {_x = 0, _y = 0}
@@ -799,11 +812,30 @@ function ux_wpt_is_holomap(waypoint)
     return result
 end
 
+function ux_wpt_marker_ident(waypoint)
+    local alt = waypoint:get_altitude()
+    return alt & 0xff
+end
+
 function ux_add_marker(wx, wy, flags)
+    local drydock = ux_get_drydock()
     local added = drydock:add_waypoint(wx, wy)
-    drydock:set_waypoint_altitude(added, flags)
+
+    drydock:set_waypoint_altitude(added, flags + ux_markers.next_marker_ident)
+    ux_markers.next_marker_ident = ux_markers.next_marker_ident + 1
+
     ux_dbg(string.format("add marker %d", added))
     return added
+end
+
+function ux_remove_marker(wpt)
+    local wpt_id = wpt:get_id()
+    local drydock = ux_get_drydock()
+    local ident = ux_wpt_marker_ident(wpt)
+    ux_replace_waypoint(drydock, function(w)
+                        return w:get_id() == wpt_id
+                    end, nil)
+    ux_markers.next_marker_ident = ident
 end
 
 function ux_render_markers(drydock, screen_w, screen_h)
@@ -814,6 +846,7 @@ function ux_render_markers(drydock, screen_w, screen_h)
     if drydock ~= nil then
         local n_wpts = drydock:get_waypoint_count()
         local cursor_pos = ux_pos:new(g_ux_cursor_world_x, g_ux_cursor_world_y)
+        ux_markers.hover_wpt = nil
         if n_wpts > 0 then
             for i = 0, n_wpts - 1 do
                 local wpt = drydock:get_waypoint(i)
@@ -827,23 +860,33 @@ function ux_render_markers(drydock, screen_w, screen_h)
                     -- captains cursor
                     update_ui_circle(screen_pos_x, screen_pos_y, 20, 12, color8(0, 0, 244, 126))
                 else
+
                     local alt = wpt:get_altitude()
                     if alt >= ux_waypoint_alt_flags.marker_x then
                         -- is a marker
+                        update_ui_circle(screen_pos_x, screen_pos_y, 20, 6, color8(0, 244, 0, 126))
+
                         if dist < 200 then
-                            ux_markers.hover_wpt = wpt:get_id()
+                            ux_markers.hover_wpt = wpt
                         end
-
-
                     end
                 end
             end
         end
 
-        if ux_markers.hover_wpt == nil then
-
-        else
-
+        if ux_markers.edit_mode then
+            if g_is_pointer_pressed then
+                ux_dbg("click")
+                if ux_markers.hover_wpt == nil then
+                    -- add
+                    g_is_pointer_pressed = false
+                    ux_add_marker(g_ux_cursor_world_x, g_ux_cursor_world_y, ux_waypoint_alt_flags.marker_x)
+                else
+                    ux_remove_marker(ux_markers.hover_wpt)
+                    ux_markers.hover_wpt = nil
+                    g_is_pointer_pressed = false
+                end
+            end
         end
     end
 end
