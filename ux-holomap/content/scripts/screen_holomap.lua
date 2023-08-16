@@ -876,14 +876,19 @@ function ux_render_markers(drydock, screen_w, screen_h)
 
                 if ux_wpt_is_holomap(wpt) then
                     -- captains cursor
-                    update_ui_circle(screen_pos_x, screen_pos_y, 20, 12, color8(0, 0, 244, 126))
+                    -- update_ui_circle(screen_pos_x, screen_pos_y, 10, 8, color8(0, 0, 244, 126))
                 else
-
                     local alt = wpt:get_altitude()
                     if alt >= ux_waypoint_alt_flags.marker_x then
                         -- is a marker
+                        -- calculate radius
+                        local rx, ry = get_screen_from_world(pos:x() + 2000, pos:y(),
+                        g_map_x + g_map_x_offset, g_map_z + g_map_z_offset,
+                        g_map_size + g_map_size_offset, screen_w, screen_h, 2.6 / 1.6)
+                        local radius = rx - screen_pos_x
+
                         local ident = ux_wpt_marker_ident_str(wpt)
-                        update_ui_circle(screen_pos_x, screen_pos_y, 20, 12, color8(0, 96, 0, 32))
+                        update_ui_circle(screen_pos_x, screen_pos_y, radius, 12, color8(0, 96, 0, 32))
                         update_ui_text(screen_pos_x, screen_pos_y, ident, 8, 2, color8(255, 255, 255, 200), 0)
                         if dist < 200 then
                             ux_markers.hover_wpt = wpt
@@ -1043,7 +1048,7 @@ function ux_update_holomap_cursor(wx, wy)
         local new_pos = ux_pos:new(wx, wy)
         ux_markers.last_cursor_pos = new_pos
 
-        ux_markers.cursor_ttl = 2
+        ux_markers.cursor_ttl = 3
         ux_replace_waypoint(drydock, ux_wpt_is_holomap,
                 {
                     x = math.floor(wx),
