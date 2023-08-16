@@ -3,7 +3,10 @@
       author="Bredroll"
       description="Modular Holomap mod inspired by UI Enhancer by QuantX
 
-Vehicle control stations can see the location of the carrier holomap cursor.
+Vehicle control stations using the UX:Control mod can see the location of the carrier holomap cursor
+as well as navigation/operations map markers created on the holomap.
+
+To add/edit markers, hold down the 'r' key and click.
 
 The UX: series of mods are intended to be easily merged into other mods and mod packs
 

@@ -890,7 +890,7 @@ function ux_render_markers(drydock, screen_w, screen_h)
                         local ident = ux_wpt_marker_ident_str(wpt)
                         update_ui_circle(screen_pos_x, screen_pos_y, radius, 12, color8(0, 96, 0, 32))
                         update_ui_text(screen_pos_x, screen_pos_y, ident, 8, 2, color8(255, 255, 255, 200), 0)
-                        if dist < 200 then
+                        if dist < 1800 then
                             ux_markers.hover_wpt = wpt
                         end
                     end

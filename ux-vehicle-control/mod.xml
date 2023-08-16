@@ -4,7 +4,11 @@
       description="Modular Vehicle Control station mod inspired by UI Enhancer by QuantX
 
 * Set aircraft waypoint altitudes quickly.
+
+If the UX:Holomap mod is installed, each control station can ..
+
 * See captain's holomap cursor
+* See operations markers placed on the holomap
 
 The UX: series of mods are intended to be easily merged into other mods and mod packs
 
