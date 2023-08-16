@@ -817,19 +817,26 @@ function ux_render_markers(drydock, screen_w, screen_h)
         if n_wpts > 0 then
             for i = 0, n_wpts - 1 do
                 local wpt = drydock:get_waypoint(i)
-                --if alt >= ux_waypoint_alt_flags.marker_x then
-                    -- a marker
-                    local pos = wpt:get_position_xz()
-                    local dist = vec2_dist(pos, cursor_pos)
-                    local screen_pos_x, screen_pos_y = get_screen_from_world(pos:x(), pos:y(),
-                            g_map_x + g_map_x_offset, g_map_z + g_map_z_offset,
-                            g_map_size + g_map_size_offset, screen_w, screen_h, 2.6 / 1.6)
-                    update_ui_circle(screen_pos_x, screen_pos_y, 20, 12, color8(0, 0, 244, 126))
+                local pos = wpt:get_position_xz()
+                local dist = vec2_dist(pos, cursor_pos)
+                local screen_pos_x, screen_pos_y = get_screen_from_world(pos:x(), pos:y(),
+                        g_map_x + g_map_x_offset, g_map_z + g_map_z_offset,
+                        g_map_size + g_map_size_offset, screen_w, screen_h, 2.6 / 1.6)
 
-                    if dist < 200 then
-                        ux_markers.hover_wpt = wpt:get_id()
+                if ux_wpt_is_holomap(wpt) then
+                    -- captains cursor
+                    update_ui_circle(screen_pos_x, screen_pos_y, 20, 12, color8(0, 0, 244, 126))
+                else
+                    local alt = wpt:get_altitude()
+                    if alt >= ux_waypoint_alt_flags.marker_x then
+                        -- is a marker
+                        if dist < 200 then
+                            ux_markers.hover_wpt = wpt:get_id()
+                        end
+
+
                     end
-                --end
+                end
             end
         end
 
