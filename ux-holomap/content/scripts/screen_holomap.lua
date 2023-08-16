@@ -437,6 +437,13 @@ function update(screen_w, screen_h, ticks)
 end
 
 function input_event(event, action)
+    if g_ui ~= nil then
+        if ux_markers.edit_marker ~= nil then
+            g_ui:input_event(event, action)
+            return
+        end
+    end
+
     if event == e_input.action_a then
         g_is_dismiss_pressed = action == e_input_action.press
 
@@ -478,6 +485,10 @@ function input_pointer(is_hovered, x, y)
     
     g_pointer_pos_x = x
     g_pointer_pos_y = y
+
+    if ux_markers.edit_marker ~= nil then
+        g_ui:input_pointer(is_hovered, x, y)
+    end
 end
 
 function input_scroll(dy)
@@ -778,9 +789,11 @@ ux_waypoint_alt_flags = {
 ux_markers = {
     edit_mode = false,
     hover_wpt = nil,
+    edit_marker = nil,
     cursor_ttl = 5,  -- skip this many updates between updating the map cursor
 
-    next_marker_ident = 1
+    next_marker_ident = 1,
+    last_cursor_pos = nil
 }
 
 ux_pos = {_x = 0, _y = 0}
@@ -823,8 +836,6 @@ function ux_add_marker(wx, wy, flags)
 
     drydock:set_waypoint_altitude(added, flags + ux_markers.next_marker_ident)
     ux_markers.next_marker_ident = ux_markers.next_marker_ident + 1
-
-    ux_dbg(string.format("add marker %d", added))
     return added
 end
 
@@ -876,17 +887,45 @@ function ux_render_markers(drydock, screen_w, screen_h)
 
         if ux_markers.edit_mode then
             if g_is_pointer_pressed then
-                ux_dbg("click")
                 if ux_markers.hover_wpt == nil then
                     -- add
                     g_is_pointer_pressed = false
                     ux_add_marker(g_ux_cursor_world_x, g_ux_cursor_world_y, ux_waypoint_alt_flags.marker_x)
                 else
-                    ux_remove_marker(ux_markers.hover_wpt)
+                    ux_markers.edit_marker = ux_markers.hover_wpt
+                    -- ux_remove_marker(ux_markers.hover_wpt)
                     ux_markers.hover_wpt = nil
                     g_is_pointer_pressed = false
                 end
             end
+        end
+        if ux_markers.edit_marker ~= nil then
+            update_set_screen_background_type(2)
+            local ui = g_ui
+            local window =  ui:begin_window(
+                    "Marker",
+                    30, 30,
+                    screen_w - 60, screen_h - 60,
+                    atlas_icons.column_distance, true, 2)
+            window.label_bias = 0.8
+            ui:header("Edit Marker")
+
+            local marker_action = ui:button_group({
+                "Delete",
+                "+ 200m",
+                "- 200m",
+            }, true)
+
+            if marker_action ~= nil then
+                -- -1 = nothing
+                if marker_action == 0 then
+                    ux_remove_marker(ux_markers.edit_marker)
+                    ux_markers.edit_marker = nil
+                    g_is_pointer_pressed = false
+                end
+            end
+
+            ui:end_window()
         end
     end
 end
@@ -942,6 +981,17 @@ function ux_update_holomap_cursor(wx, wy)
             ux_markers.cursor_ttl = ux_markers.cursor_ttl - 1
             return
         end
+        local new_pos = ux_pos:new(wx, wy)
+        -- if it didnt move, just return
+        if ux_markers.last_cursor_pos ~= nil then
+            -- check dist
+            local delta = vec2_dist(new_pos, ux_markers.last_cursor_pos)
+            if delta < 50 then
+                return
+            end
+        end
+        ux_markers.last_cursor_pos = new_pos
+
         ux_markers.cursor_ttl = 2
         ux_replace_waypoint(drydock, ux_wpt_is_holomap,
                 {
