@@ -31,6 +31,7 @@ GROUPED = {
     "screen_navigation": "helm",
     "screen_compass": "helm",
 
+    "screen_damage": "info",
     "screen_ship_log": "info",
     "screen_currency": "info",
     "screen_delivery_log": "info",
@@ -41,8 +42,8 @@ GROUPED = {
     "screen_cctv": "info",
 }
 
-for lib_file in LIBRARY_FILES:
-    GROUPED[Path(lib_file).stem] = "lib"
+for _lib_file in LIBRARY_FILES:
+    GROUPED[Path(_lib_file).stem] = "lib"
 
 
 parser = argparse.ArgumentParser(description=__doc__)
@@ -102,7 +103,10 @@ def populate(base=True):
                     output.write(script.read_text(encoding="utf-8"))
                     if lower not in LIBRARY_FILES:
                         # append the three libs even if it doesn't need them
-                        pass
+                        for lib_filename in LIBRARY_FILES:
+                            lib_file = UI_ENHANCER_QUANTX / lib_filename
+                            print(f"\n-- include {lib_filename} from UI Enhancer\n", file=output)
+                            output.write(lib_file.read_text(encoding="utf-8"))
 
 
 def run(args=None):
